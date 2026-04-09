@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Splat Web Viewer Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111; color: #eee; font-family: system-ui, sans-serif; overflow: hidden; }
+    #canvas { width: 100vw; height: 100vh; display: block; }
+    #overlay {
+      position: fixed; top: 16px; left: 16px;
+      background: rgba(0,0,0,0.7); padding: 12px 16px; border-radius: 8px;
+      font-size: 13px; line-height: 1.5; pointer-events: none;
+    }
+    #overlay.hidden { display: none; }
+    #controls {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 8px;
+    }
+    #controls button {
+      background: #333; border: 1px solid #555; color: #eee;
+      padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;
+    }
+    #controls button:hover { background: #444; }
+    #file-input { display: none; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="overlay">
+    <div>Splat Web Viewer</div>
+    <div id="stats">No file loaded</div>
+    <div id="fps"></div>
+  </div>
+
+  <div id="controls">
+    <button id="btn-load" onclick="document.getElementById('file-input').click()">
+      Load .spz
+    </button>
+    <button id="btn-export">Export glTF</button>
+    <button id="btn-stream">Connect Stream</button>
+    <button id="btn-info" onclick="document.getElementById('overlay').classList.toggle('hidden')">
+      Toggle Info
+    </button>
+  </div>
+
+  <input type="file" id="file-input" accept=".spz">
+
+  <script type="module">
+    import { decodeSPZ, WebGPURasterizer, WebGLFallbackRenderer, WebRTCSplatClient, exportToGLTF } from "../dist/splat-viewer.js";
+
+    const canvas = document.getElementById("canvas");
+    const statsEl = document.getElementById("stats");
+    const fpsEl = document.getElementById("fps");
+
+    canvas.width = window.innerWidth * devicePixelRatio;
+    canvas.height = window.innerHeight * devicePixelRatio;
+
+    let renderer = null;
+    let splats = [];
+    let useWebGPU = !!navigator.gpu;
+
+    // Camera state
+    const camera = {
+      viewMatrix: new Float32Array(16),
+      projMatrix: new Float32Array(16),
+      position: new Float32Array([0, 0, 5]),
+      focalX: canvas.width * 0.8,
+      focalY: canvas.height * 0.8,
+    };
+
+    // Identity matrices
+    camera.viewMatrix.set([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,-5,1]);
+    camera.projMatrix.set([
+      2*camera.focalX/canvas.width, 0, 0, 0,
+      0, 2*camera.focalY/canvas.height, 0, 0,
+      0, 0, -1.002, -1,
+      0, 0, -0.2002, 0
+    ]);
+
+    async function initRenderer() {
+      if (useWebGPU) {
+        try {
+          renderer = new WebGPURasterizer(canvas);
+          await renderer.initialize();
+          statsEl.textContent = "Renderer: WebGPU";
+        } catch (e) {
+          console.warn("WebGPU init failed, falling back to WebGL:", e);
+          useWebGPU = false;
+        }
+      }
+      if (!useWebGPU) {
+        renderer = new WebGLFallbackRenderer(canvas);
+        renderer.initialize();
+        statsEl.textContent = "Renderer: WebGL 2 (fallback)";
+      }
+    }
+
+    // Load .spz file
+    document.getElementById("file-input").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      statsEl.textContent = `Loading ${file.name}...`;
+      const buffer = await file.arrayBuffer();
+      splats = await decodeSPZ(buffer);
+      renderer.uploadSplats(splats);
+      statsEl.textContent = `${splats.length.toLocaleString()} splats (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB)`;
+    });
+
+    // Export glTF
+    document.getElementById("btn-export").addEventListener("click", () => {
+      if (splats.length === 0) { alert("No splats loaded"); return; }
+      const json = exportToGLTF(splats);
+      const blob = new Blob([json], { type: "model/gltf+json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "splats.gltf";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // WebRTC streaming
+    document.getElementById("btn-stream").addEventListener("click", async () => {
+      const serverUrl = prompt("WebRTC server URL:", "http://localhost:8081");
+      if (!serverUrl) return;
+      const client = new WebRTCSplatClient(serverUrl);
+      client.onDeltaReceived((delta) => {
+        if (renderer && renderer.updateFromDelta) {
+          renderer.updateFromDelta(delta);
+        }
+      });
+      await client.connect();
+      statsEl.textContent += " | Streaming";
+    });
+
+    // Render loop
+    let lastTime = performance.now();
+    let frameCount = 0;
+
+    function frame() {
+      requestAnimationFrame(frame);
+      if (renderer && splats.length > 0) {
+        renderer.render(camera);
+      }
+
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        fpsEl.textContent = `${frameCount} FPS`;
+        frameCount = 0;
+        lastTime = now;
+      }
+    }
+
+    initRenderer().then(frame);
+
+    // Resize handling
+    window.addEventListener("resize", () => {
+      canvas.width = window.innerWidth * devicePixelRatio;
+      canvas.height = window.innerHeight * devicePixelRatio;
+    });
+  </script>
+</body>
+</html>

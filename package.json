@@ -9,6 +9,9 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0",
-    "rollup": "^4.13.0"
+    "rollup": "^4.13.0",
+    "@rollup/plugin-typescript": "^11.1.0",
+    "tslib": "^2.6.0",
+    "concurrently": "^8.2.0"
   }
 }
