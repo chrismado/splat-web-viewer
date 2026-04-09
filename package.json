@@ -8,10 +8,11 @@
     "stream-demo": "concurrently \"python streaming/webrtc_server.py\" \"npm run demo\""
   },
   "devDependencies": {
+    "@rollup/plugin-typescript": "^11.1.0",
+    "@webgpu/types": "^0.1.64",
+    "concurrently": "^8.2.0",
     "typescript": "^5.4.0",
     "rollup": "^4.13.0",
-    "@rollup/plugin-typescript": "^11.1.0",
-    "tslib": "^2.6.0",
-    "concurrently": "^8.2.0"
+    "tslib": "^2.6.0"
   }
 }

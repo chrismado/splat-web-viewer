@@ -85,33 +85,34 @@ Hardware: Consumer GPU (RTX 3090), Chrome 122+.
 
 ```
 splat-web-viewer/
-├── src/
-│   ├── renderer/
-│   │   ├── webgpu_renderer.ts      # Core WebGPU rasterizer
-│   │   ├── webgl_fallback.ts       # WebGL fallback renderer
-│   │   └── mip_filter.wgsl         # 2D Mip-filter fragment shader
-│   ├── compression/
-│   │   ├── spz_decoder.ts          # SPZ → Gaussian decompression
-│   │   ├── spz_wasm/               # Compiled WASM decompressor
-│   │   └── coordinate_converter.ts # Right-Up-Back → WebGL conversion
-│   ├── streaming/
-│   │   ├── webrtc_client.ts        # WebRTC data channel client
-│   │   ├── sh_delta_decoder.ts     # Spherical harmonic delta decoder
-│   │   └── webrtc_server.py        # Python server (cloud GPU side)
-│   ├── export/
-│   │   └── gltf_exporter.ts        # KHR_gaussian_splatting glTF export
-│   └── index.ts                    # Entry point
-├── shaders/
-│   ├── gaussian_splat.wgsl         # Main splat vertex/fragment shaders
-│   └── mip_splatting.wgsl          # Anti-aliased Mip filter shaders
-├── wasm/
-│   └── spz_decoder/                # Rust/C++ WASM source
-├── demo/
-│   └── index.html                  # Live demo page
 ├── benchmarks/
-│   └── performance_test.ts         # FPS, bandwidth, PSNR benchmarks
+│   └── performance_test.ts
+├── demo/
+│   └── index.html
+├── shaders/
+│   └── mip_splatting.wgsl
+├── src/
+│   ├── compression/
+│   │   ├── coordinate_converter.ts
+│   │   └── spz_decoder.ts
+│   ├── export/
+│   │   └── gltf_exporter.ts
+│   ├── renderer/
+│   │   ├── webgl_fallback.ts
+│   │   └── webgpu_renderer.ts
+│   ├── streaming/
+│   │   ├── sh_delta_decoder.ts
+│   │   ├── webrtc_client.ts
+│   │   └── webrtc_server.py
+│   └── index.ts
 ├── tests/
 │   └── test_spz_decoder.ts
+├── wasm/
+│   └── spz_decoder/
+│       └── README.md
+├── package.json
+├── rollup.config.js
+├── tsconfig.json
 └── README.md
 ```
 

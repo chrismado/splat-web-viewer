@@ -45,7 +45,8 @@ interface SPZHeader {
  * Decompress gzipped data using the browser's DecompressionStream API.
  */
 async function decompressGzip(compressed: Uint8Array): Promise<Uint8Array> {
-  const stream = new Response(compressed).body!
+  const payload = new Uint8Array(compressed).buffer;
+  const stream = new Response(new Blob([payload])).body!
     .pipeThrough(new DecompressionStream("gzip"));
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
