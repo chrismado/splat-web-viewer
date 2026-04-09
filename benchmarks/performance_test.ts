@@ -9,7 +9,7 @@
  *   (or compile and run in a browser context for WebGPU benchmarks)
  */
 
-import { GaussianSplat, decodeSPZ } from "../src/compression/spz_decoder";
+import { decodeSPZ } from "../src/compression/spz_decoder";
 import { SphericalHarmonicDelta } from "../src/streaming/webrtc_client";
 
 interface BenchmarkResult {
@@ -179,13 +179,13 @@ function benchmarkDeltaDecompress(iterations: number = 100_000): BenchmarkResult
   for (let i = 0; i < iterations; i++) {
     // Inline decompression to benchmark without import side effects
     const dv = new DataView(buffer);
-    const _idx = dv.getUint32(0, true);
+    dv.getUint32(0, true);
     const nc = dv.getUint16(4, true);
     const coeffs = new Float32Array(nc);
     for (let j = 0; j < nc; j++) {
       coeffs[j] = dv.getFloat32(6 + j * 4, true);
     }
-    const _ts = dv.getFloat64(6 + nc * 4, true);
+    dv.getFloat64(6 + nc * 4, true);
   }
   const elapsed = performance.now() - start;
 
@@ -232,9 +232,13 @@ async function generateTestSPZ(numPoints: number): Promise<ArrayBuffer> {
     const reader = stream.getReader();
     const chunks: Uint8Array[] = [];
     let total = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+  let streamDone = false;
+  while (!streamDone) {
+    const { done, value } = await reader.read();
+    if (done) {
+      streamDone = true;
+      continue;
+    }
       chunks.push(value);
       total += value.byteLength;
     }

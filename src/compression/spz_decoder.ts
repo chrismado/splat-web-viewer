@@ -52,9 +52,13 @@ async function decompressGzip(compressed: Uint8Array): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
   let totalLength = 0;
 
-  while (true) {
+  let streamDone = false;
+  while (!streamDone) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      streamDone = true;
+      continue;
+    }
     chunks.push(value);
     totalLength += value.byteLength;
   }

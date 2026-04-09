@@ -181,7 +181,6 @@ export class WebGPURasterizer {
     //
     // For the base color (DC component, degree 0), the first 3 coefficients
     // map directly to RGB. We update the color field in the splat buffer.
-    const floatsPerSplat = SPLAT_STRIDE / 4;
     const colorOffset = delta.gaussianIndex * SPLAT_STRIDE + 4 * 4; // skip position(3) + opacity(1)
 
     if (delta.coefficients.length >= 3) {

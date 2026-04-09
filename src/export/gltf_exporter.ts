@@ -42,7 +42,6 @@ interface GLTFDocument {
 
 // glTF component type constants
 const GL_FLOAT = 5126;
-const GL_UNSIGNED_BYTE = 5121;
 
 /**
  * Export an array of Gaussian splats to a glTF 2.0 JSON string.
@@ -74,8 +73,8 @@ export function exportToGLTF(splats: GaussianSplat[]): string {
   const buffer = new ArrayBuffer(totalBytes);
   const f32 = new Float32Array(buffer);
 
-  let posMin = [Infinity, Infinity, Infinity];
-  let posMax = [-Infinity, -Infinity, -Infinity];
+  const posMin = [Infinity, Infinity, Infinity];
+  const posMax = [-Infinity, -Infinity, -Infinity];
 
   let floatOffset = 0;
 
