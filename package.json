@@ -1,0 +1,14 @@
+{
+  "name": "splat-web-viewer",
+  "version": "0.1.0",
+  "description": "Anti-aliased WebGPU Gaussian splat viewer with SPZ streaming and WebRTC",
+  "scripts": {
+    "build": "tsc && rollup -c",
+    "demo": "python -m http.server 8080 --directory demo",
+    "stream-demo": "concurrently \"python streaming/webrtc_server.py\" \"npm run demo\""
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "rollup": "^4.13.0"
+  }
+}
