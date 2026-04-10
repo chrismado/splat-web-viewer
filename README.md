@@ -4,11 +4,31 @@
 
 A dependency-free WebGPU/WebGL viewer that natively streams .spz compressed Gaussian splats via SPZ decompression (WebAssembly), executes dynamic 2D Mip-filtering in the fragment shader to eliminate aliasing, and receives live spherical harmonic delta updates over a WebRTC bi-directional data channel for sub-100ms interactive rendering.
 
-No existing open-source viewer combines all three of these capabilities. This repo is the gap that fills them simultaneously.
+This prototype explores the intersection of browser-native 3D review, compressed Gaussian splat assets, anti-aliased rendering, and live scene updates.
+
+Live demo: [chrismado.github.io/splat-web-viewer](https://chrismado.github.io/splat-web-viewer/)
 
 ---
 
-## The Gap No Existing Viewer Fills
+## Portfolio Context
+
+This repo is part of [Creative AI Workflows](https://github.com/chrismado/creative-ai-workflows), a portfolio showcase connecting generative video, 3D scene review, creative QA, and enterprise deployment.
+
+In that system, `splat-web-viewer` is the **visual demo anchor**. It gives creative teams a browser-based way to inspect spatial assets, choose camera positions, and create stronger references before moving into generative video or animation.
+
+### Customer-Facing Use Case
+
+An architecture, product, VFX, or digital-human team wants to review spatial context without a heavy local 3D setup. This repo is positioned as the bridge between 3D scene understanding and AI-assisted video workflows: inspect the world, pick the visual intent, then generate or animate from a better reference.
+
+### Demo Narrative
+
+- Start with a spatial asset that would normally require specialist review tools.
+- Open it in the browser, inspect camera positions, and save visual references.
+- Connect those references to a generative video or previs workflow.
+
+---
+
+## Target Capability Gap
 
 | Viewer | Framework | SPZ Support | Mip-Filtering | WebRTC Streaming |
 |--------|-----------|-------------|---------------|-----------------|
