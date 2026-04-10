@@ -7,8 +7,6 @@
  *   SPZ (Niantic):   Right-Up-Back   (RUB)
  *   WebGL/OpenGL:    Right-Up-Forward (RUF) -- negate Z from SPZ
  *   glTF:            Right-Up-Forward (RUF) -- same as WebGL
- *   Unreal Engine:   Right-Forward-Up (RFU) -- swap Y/Z from WebGL
- *   Unity:           Right-Up-Forward (left-handed) -- negate Z from RUF
  */
 
 import { GaussianSplat } from "./spz_decoder";
@@ -17,8 +15,6 @@ export enum CoordinateSystem {
   SPZ = "SPZ",           // Right-Up-Back
   WebGL = "WebGL",       // Right-Up-Forward
   GLTF = "GLTF",         // Right-Up-Forward (same as WebGL)
-  Unreal = "Unreal",     // Right-Forward-Up
-  Unity = "Unity",       // Right-Up-Forward (left-handed, negate Z)
 }
 
 /**
@@ -31,7 +27,6 @@ export function convertSPZToWebGL(splat: GaussianSplat): GaussianSplat {
   const rotation = new Float32Array(splat.rotation);
 
   position[2] *= -1;
-  scale[2] *= -1;
   rotation[1] *= -1; // qx
   rotation[2] *= -1; // qy
 

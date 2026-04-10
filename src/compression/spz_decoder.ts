@@ -229,8 +229,8 @@ export async function decodeSPZ(buffer: ArrayBuffer): Promise<GaussianSplat[]> {
  * Convert a single Gaussian from SPZ coordinate system (Right-Up-Back)
  * to standard WebGL coordinate system (Right-Up-Forward).
  *
- * Transform: negate the Z axis for positions, scales, and the Z/W
- * components of the rotation quaternion to mirror across the XY plane.
+ * Transform: negate the Z axis for positions and absorb the handedness
+ * flip into the quaternion while keeping Gaussian scales positive.
  */
 export function convertCoordinates(splat: GaussianSplat): GaussianSplat {
   const position = new Float32Array(splat.position);
@@ -240,13 +240,9 @@ export function convertCoordinates(splat: GaussianSplat): GaussianSplat {
   // Negate Z position (flip forward/back)
   position[2] *= -1;
 
-  // Negate Z scale to reflect the axis flip
-  scale[2] *= -1;
-
-  // For quaternion: negating the Z axis means reflecting rotations
-  // that involve the Z axis. Negate the x and y components of the
-  // imaginary part (indices 1, 2 in [w, x, y, z] layout) to
-  // conjugate the rotation around the Z-flip.
+  // Keep scales positive and absorb the axis flip into the rotation.
+  // Reflecting the basis across Z corresponds to negating the x/y
+  // imaginary components of the quaternion in [w, x, y, z] layout.
   rotation[1] *= -1; // qx
   rotation[2] *= -1; // qy
 
