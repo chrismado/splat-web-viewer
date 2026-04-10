@@ -12,7 +12,7 @@ Live demo: [chrismado.github.io/splat-web-viewer](https://chrismado.github.io/sp
 
 ## Portfolio Context
 
-This repo is part of [Creative AI Workflows](https://github.com/chrismado/creative-ai-workflows), a portfolio showcase connecting generative video, 3D scene review, creative QA, and enterprise deployment.
+This repo is part of [Creative AI Workflows](https://chrismado.github.io/creative-ai-workflows/) ([source](https://github.com/chrismado/creative-ai-workflows)), a portfolio showcase connecting generative video, 3D scene review, creative QA, and enterprise deployment.
 
 In that system, `splat-web-viewer` is the **visual demo anchor**. It gives creative teams a browser-based way to inspect spatial assets, choose camera positions, and create stronger references before moving into generative video or animation.
 
