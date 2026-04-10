@@ -129,8 +129,8 @@
       if (!serverUrl) return;
       const client = new WebRTCSplatClient(serverUrl);
       client.onDeltaReceived((delta) => {
-        if (renderer && renderer.updateFromDelta) {
-          renderer.updateFromDelta(delta);
+        if (renderer && renderer.updateColors) {
+          renderer.updateColors(delta);
         }
       });
       await client.connect();

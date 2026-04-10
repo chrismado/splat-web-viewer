@@ -162,7 +162,7 @@ export function exportToGLTF(splats: GaussianSplat[]): string {
       { bufferView: 2, componentType: GL_FLOAT, count: numSplats, type: "SCALAR" },
       { bufferView: 3, componentType: GL_FLOAT, count: numSplats, type: "VEC3" },
       { bufferView: 4, componentType: GL_FLOAT, count: numSplats, type: "VEC4" },
-      { bufferView: 5, componentType: GL_FLOAT, count: numSplats, type: "SCALAR" },
+      { bufferView: 5, componentType: GL_FLOAT, count: numSplats * shCoeffsPerSplat, type: "SCALAR" },
     ],
     meshes: [{
       primitives: [{

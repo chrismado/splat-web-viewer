@@ -28,6 +28,7 @@ export class WebGPURasterizer {
   private context!: GPUCanvasContext;
   private pipeline!: GPURenderPipeline;
   private uniformBuffer!: GPUBuffer;
+  private vertexUniformBuffer!: GPUBuffer;
   private splatBuffer!: GPUBuffer;
   private bindGroup!: GPUBindGroup;
   private numSplats = 0;
@@ -68,6 +69,11 @@ export class WebGPURasterizer {
     // Vertex uniform buffer: view/proj matrices, camera params
     // VertexUniforms: mat4x4 (64) + mat4x4 (64) + vec3 (12) + f32 (4) + vec2 (8) + vec2 (8) = 160 bytes
     this.uniformBuffer = this.device.createBuffer({
+      size: 160,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    this.vertexUniformBuffer = this.device.createBuffer({
       size: 160,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
@@ -161,44 +167,44 @@ export class WebGPURasterizer {
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },  // MipUniforms
-        { binding: 1, resource: { buffer: this.uniformBuffer } },  // VertexUniforms (shared)
+        { binding: 1, resource: { buffer: this.vertexUniformBuffer } },  // VertexUniforms
         { binding: 2, resource: { buffer: this.splatBuffer } },
       ],
     });
   }
 
   /**
-   * Apply an incoming SH delta update to a specific Gaussian without full re-upload.
-   * Writes only the changed coefficients to the GPU buffer.
+   * Update the color of a specific Gaussian splat from new SH coefficients.
+   * Writes the new color values directly to the GPU buffer without full re-upload.
    */
-  updateFromDelta(delta: SphericalHarmonicDelta): void {
+  updateColors(delta: SphericalHarmonicDelta): void {
     if (!this.splatBuffer || delta.gaussianIndex >= this.numSplats) return;
 
     // SH coefficients affect the color of the Gaussian.
-    // For real-time updates, we apply the delta to the color stored in the buffer.
+    // For real-time updates, we write new color values directly to the buffer.
     // The SH evaluation: color = SH_0 * c_dc + sum(SH_l_m * c_l_m)
-    // Delta updates modify c_l_m coefficients.
+    // Updates replace the existing c_l_m coefficients.
     //
     // For the base color (DC component, degree 0), the first 3 coefficients
     // map directly to RGB. We update the color field in the splat buffer.
     const colorOffset = delta.gaussianIndex * SPLAT_STRIDE + 4 * 4; // skip position(3) + opacity(1)
 
     if (delta.coefficients.length >= 3) {
-      // Update DC color: apply delta to RGB
-      // Read current color, add delta, write back
-      const colorDelta = new Float32Array(4);
-      colorDelta[0] = delta.coefficients[0]; // R delta
-      colorDelta[1] = delta.coefficients[1]; // G delta
-      colorDelta[2] = delta.coefficients[2]; // B delta
-      colorDelta[3] = 0.0; // alpha unchanged
+      // Update DC color: replace RGB values
+      // Write new absolute color values
+      const colorData = new Float32Array(4);
+      colorData[0] = delta.coefficients[0]; // R
+      colorData[1] = delta.coefficients[1]; // G
+      colorData[2] = delta.coefficients[2]; // B
+      colorData[3] = 0.0; // alpha unchanged
 
-      // We write the delta as an additive update via a staging buffer
-      // For simplicity, we use writeBuffer with the new absolute values
-      // In production, a compute shader would handle the accumulation
+      // Write absolute color values to the GPU buffer
+
+
       this.device.queue.writeBuffer(
         this.splatBuffer,
         colorOffset,
-        colorDelta.buffer,
+        colorData.buffer,
         0,
         16
       );
@@ -279,6 +285,7 @@ export class WebGPURasterizer {
   destroy(): void {
     this.splatBuffer?.destroy();
     this.uniformBuffer?.destroy();
+    this.vertexUniformBuffer?.destroy();
   }
 }
 
