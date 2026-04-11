@@ -10,6 +10,38 @@ Live demo target: [chrismado.github.io/splat-web-viewer](https://chrismado.githu
 
 ---
 
+## Current Status
+
+This is a browser review prototype with a now-verified JavaScript toolchain.
+
+- The TypeScript, lint, test, and build paths all run cleanly on a local Node environment.
+- The repo includes a synthetic sample scene, shared CPU-side splat sorting, and both WebGPU and WebGL rendering paths.
+- The strongest current value is browser review workflow exploration, not a claim of full production-grade 3D Gaussian Splat support.
+- Real public demo proof still improves when paired with a screen recording or approved public asset.
+
+## Validation Snapshot
+
+Verified locally on April 11, 2026 with Node `24.14.1`:
+
+- `npm ci`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test`
+- `npm run build`
+
+Observed result:
+
+- `2` test files passed
+- `10` tests passed
+- Rollup build succeeded and produced `dist/splat-viewer.js`
+
+Still prototype:
+
+- Real `.spz` compatibility is still an exploration path rather than a complete format guarantee.
+- The most convincing creative proof will come from a public screen capture, GIF, or real scene review asset.
+
+---
+
 ## Portfolio Context
 
 This repo is part of [Creative AI Workflows](https://chrismado.github.io/creative-ai-workflows/) ([source](https://github.com/chrismado/creative-ai-workflows)), a portfolio showcase connecting generative video, 3D scene review, creative QA, and enterprise deployment.
