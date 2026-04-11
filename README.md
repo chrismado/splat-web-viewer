@@ -1,5 +1,10 @@
 # splat-web-viewer
 
+[![CI](https://github.com/chrismado/splat-web-viewer/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/chrismado/splat-web-viewer/actions/workflows/ci.yml)
+[![Pages](https://github.com/chrismado/splat-web-viewer/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/chrismado/splat-web-viewer/actions/workflows/pages.yml)
+[![Live Demo](https://img.shields.io/badge/live-demo-1e5b66?style=flat-square)](https://chrismado.github.io/splat-web-viewer/)
+[![Portfolio](https://img.shields.io/badge/portfolio-creative%20ai%20workflows-f1b84b?style=flat-square)](https://chrismado.github.io/creative-ai-workflows/)
+
 **Browser Gaussian Splat Review Prototype**
 
 A TypeScript prototype for browser-native Gaussian splat review. It includes SPZ parsing with the browser `DecompressionStream` API, WebGPU/WebGL rendering paths, shader-side mip-filtering exploration, a built-in sample scene, and a WebRTC spherical-harmonic delta integration point.
@@ -34,6 +39,7 @@ Observed result:
 - `2` test files passed
 - `10` tests passed
 - Rollup build succeeded and produced `dist/splat-viewer.js`
+- GitHub CI and Pages are green on `main`
 
 Still prototype:
 
