@@ -5,7 +5,7 @@
  * Uses instanced rendering of camera-facing quads with alpha blending.
  *
  * Limitations vs WebGPU renderer:
- *   - No compute-shader-based sorting (uses CPU front-to-back sort)
+ *   - Uses CPU back-to-front sorting instead of a GPU sort pass
  *   - No mip-splatting anti-aliasing (uses basic 2D Gaussian falloff)
  *   - Lower max splat count (~500k vs ~2M on WebGPU)
  */
@@ -113,6 +113,8 @@ export class WebGLFallbackRenderer {
   private instanceBuffer: WebGLBuffer | null = null;
   private numSplats = 0;
   private canvas: HTMLCanvasElement;
+  private splats: GaussianSplat[] = [];
+  private lastSortSignature = "";
 
   // Uniform locations
   private uViewMatrix: WebGLUniformLocation | null = null;
@@ -177,16 +179,22 @@ export class WebGLFallbackRenderer {
   }
 
   uploadSplats(splats: GaussianSplat[]): void {
-    this.numSplats = splats.length;
+    this.splats = splats.slice();
+    this.numSplats = this.splats.length;
     if (this.numSplats === 0) return;
 
+    this.lastSortSignature = "";
+    this.updateInstanceBuffer(this.splats);
+  }
+
+  private updateInstanceBuffer(splats: GaussianSplat[]): void {
     const gl = this.gl;
 
     // Pack instance data: center(3) + opacity(1) + color(3) + scale(3) + rotation(4) = 14 floats
     const floatsPerInstance = 14;
-    const data = new Float32Array(this.numSplats * floatsPerInstance);
+    const data = new Float32Array(splats.length * floatsPerInstance);
 
-    for (let i = 0; i < this.numSplats; i++) {
+    for (let i = 0; i < splats.length; i++) {
       const s = splats[i];
       const base = i * floatsPerInstance;
       data[base + 0] = s.position[0];
@@ -237,10 +245,13 @@ export class WebGLFallbackRenderer {
   render(camera: {
     viewMatrix: Float32Array;
     projMatrix: Float32Array;
+    position: Float32Array;
     focalX: number;
     focalY: number;
   }): void {
     if (this.numSplats === 0 || !this.program) return;
+
+    this.resortSplats(camera.position);
 
     const gl = this.gl;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -256,6 +267,28 @@ export class WebGLFallbackRenderer {
     gl.bindVertexArray(this.vao);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.numSplats);
     gl.bindVertexArray(null);
+  }
+
+  private resortSplats(cameraPosition: Float32Array): void {
+    const signature = Array.from(cameraPosition)
+      .map((value) => value.toFixed(3))
+      .join("|");
+    if (signature === this.lastSortSignature) {
+      return;
+    }
+
+    const sortedSplats = [...this.splats].sort(
+      (a, b) => this.distanceSquared(b.position, cameraPosition) - this.distanceSquared(a.position, cameraPosition)
+    );
+    this.updateInstanceBuffer(sortedSplats);
+    this.lastSortSignature = signature;
+  }
+
+  private distanceSquared(position: Float32Array, cameraPosition: Float32Array): number {
+    const dx = position[0] - cameraPosition[0];
+    const dy = position[1] - cameraPosition[1];
+    const dz = position[2] - cameraPosition[2];
+    return dx * dx + dy * dy + dz * dz;
   }
 
   destroy(): void {

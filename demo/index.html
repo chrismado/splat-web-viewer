@@ -69,6 +69,16 @@
     let lastPointerX = 0;
     let lastPointerY = 0;
 
+    function setStatus(message) {
+      statsEl.textContent = message;
+    }
+
+    function setError(error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(error);
+      statsEl.textContent = `Error: ${message}`;
+    }
+
     // Camera state
     const camera = {
       viewMatrix: new Float32Array(16),
@@ -151,8 +161,12 @@
         makeSplat(0.8, 0.28, 0.1, [0.65, 0.86, 0.45]),
         makeSplat(0.05, 0.05, 0.45, [0.95, 0.95, 0.98], 0.18, 0.55),
       ];
+      if (!renderer) {
+        setError("Renderer not initialized");
+        return;
+      }
       renderer.uploadSplats(splats);
-      statsEl.textContent = `Sample scene: ${splats.length} splats`;
+      setStatus(`Sample scene: ${splats.length} splats`);
     }
 
     async function initRenderer() {
@@ -160,7 +174,7 @@
         try {
           renderer = new WebGPURasterizer(canvas);
           await renderer.initialize();
-          statsEl.textContent = "Renderer: WebGPU";
+          setStatus("Renderer: WebGPU");
         } catch (e) {
           console.warn("WebGPU init failed, falling back to WebGL:", e);
           useWebGPU = false;
@@ -169,7 +183,7 @@
       if (!useWebGPU) {
         renderer = new WebGLFallbackRenderer(canvas);
         renderer.initialize();
-        statsEl.textContent = "Renderer: WebGL 2 (fallback)";
+        setStatus("Renderer: WebGL 2 (fallback)");
       }
       loadSampleScene();
     }
@@ -179,11 +193,20 @@
       const file = e.target.files[0];
       if (!file) return;
 
-      statsEl.textContent = `Loading ${file.name}...`;
-      const buffer = await file.arrayBuffer();
-      splats = await decodeSPZ(buffer);
-      renderer.uploadSplats(splats);
-      statsEl.textContent = `${splats.length.toLocaleString()} splats (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB)`;
+      try {
+        if (!renderer) {
+          throw new Error("Renderer not initialized");
+        }
+        setStatus(`Loading ${file.name}...`);
+        const buffer = await file.arrayBuffer();
+        splats = await decodeSPZ(buffer);
+        renderer.uploadSplats(splats);
+        setStatus(`${splats.length.toLocaleString()} splats (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB)`);
+      } catch (error) {
+        setError(error);
+      } finally {
+        e.target.value = "";
+      }
     });
 
     document.getElementById("btn-sample").addEventListener("click", loadSampleScene);
@@ -241,14 +264,18 @@
     document.getElementById("btn-stream").addEventListener("click", async () => {
       const serverUrl = prompt("WebRTC server URL:", "http://localhost:8081");
       if (!serverUrl) return;
-      const client = new WebRTCSplatClient(serverUrl);
-      client.onDeltaReceived((delta) => {
-        if (renderer && renderer.updateColors) {
-          renderer.updateColors(delta);
-        }
-      });
-      await client.connect();
-      statsEl.textContent += " | Streaming";
+      try {
+        const client = new WebRTCSplatClient(serverUrl);
+        client.onDeltaReceived((delta) => {
+          if (renderer && renderer.updateColors) {
+            renderer.updateColors(delta);
+          }
+        });
+        await client.connect();
+        setStatus(`${statsEl.textContent} | Streaming`);
+      } catch (error) {
+        setError(error);
+      }
     });
 
     // Render loop
@@ -270,7 +297,9 @@
       }
     }
 
-    initRenderer().then(frame);
+    initRenderer().then(frame).catch((error) => {
+      setError(error);
+    });
 
     // Resize handling
     window.addEventListener("resize", () => {

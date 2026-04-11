@@ -4,8 +4,8 @@
  * Takes decoded GaussianSplat[] and renders them using WebGPU with the
  * mip_splatting.wgsl shader for anti-aliased rendering.
  *
- * Supports incremental SH delta updates from the WebRTC streaming client
- * without requiring full buffer re-upload.
+ * Supports incremental SH delta updates from the WebRTC streaming client,
+ * refreshing the sorted GPU buffer on the next render.
  */
 
 import { GaussianSplat } from "../compression/spz_decoder";
@@ -37,6 +37,8 @@ export class WebGPURasterizer {
   private numSplats = 0;
   private canvas: HTMLCanvasElement;
   private maxSamplingInterval = 0.0003; // Default s_max for 3D smoothing filter
+  private splats: GaussianSplat[] = [];
+  private lastSortSignature = "";
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -119,7 +121,8 @@ export class WebGPURasterizer {
    * Upload decoded Gaussian splats to the GPU.
    */
   uploadSplats(splats: GaussianSplat[]): void {
-    this.numSplats = splats.length;
+    this.splats = splats.slice();
+    this.numSplats = this.splats.length;
     if (this.numSplats === 0) return;
 
     const bufferSize = this.numSplats * SPLAT_STRIDE;
@@ -134,37 +137,8 @@ export class WebGPURasterizer {
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
 
-    // Pack splat data into the buffer format expected by the shader
-    const data = new Float32Array(this.numSplats * (SPLAT_STRIDE / 4));
-    const floatsPerSplat = SPLAT_STRIDE / 4;
-
-    for (let i = 0; i < this.numSplats; i++) {
-      const splat = splats[i];
-      const base = i * floatsPerSplat;
-
-      // position: vec3<f32>
-      data[base + 0] = splat.position[0];
-      data[base + 1] = splat.position[1];
-      data[base + 2] = splat.position[2];
-      // opacity: f32
-      data[base + 3] = splat.alpha;
-      // color: vec4<f32>
-      data[base + 4] = splat.color[0];
-      data[base + 5] = splat.color[1];
-      data[base + 6] = splat.color[2];
-      data[base + 7] = 1.0; // alpha channel of color
-
-      // Compute 3D covariance from scale and rotation
-      const cov3d = computeCov3D(splat.scale, splat.rotation);
-      data[base + 8]  = cov3d[0];
-      data[base + 9]  = cov3d[1];
-      data[base + 10] = cov3d[2];
-      data[base + 11] = cov3d[3];
-      data[base + 12] = cov3d[4];
-      data[base + 13] = cov3d[5];
-    }
-
-    this.device.queue.writeBuffer(this.splatBuffer, 0, data);
+    this.lastSortSignature = "";
+    this.writeSplatsToBuffer(this.splats);
 
     // Create bind group with the new buffer
     this.bindGroup = this.device.createBindGroup({
@@ -179,7 +153,7 @@ export class WebGPURasterizer {
 
   /**
    * Update the color of a specific Gaussian splat from new SH coefficients.
-   * Writes the new color values directly to the GPU buffer without full re-upload.
+   * Marks the sorted GPU buffer dirty so the new color is uploaded next frame.
    */
   updateColors(delta: SphericalHarmonicDelta): void {
     if (!this.splatBuffer || delta.gaussianIndex >= this.numSplats) return;
@@ -191,27 +165,12 @@ export class WebGPURasterizer {
     //
     // For the base color (DC component, degree 0), the first 3 coefficients
     // map directly to RGB. We update the color field in the splat buffer.
-    const colorOffset = delta.gaussianIndex * SPLAT_STRIDE + 4 * 4; // skip position(3) + opacity(1)
-
     if (delta.coefficients.length >= 3) {
-      // Update DC color: replace RGB values
-      // Write new absolute color values
-      const colorData = new Float32Array(4);
-      colorData[0] = delta.coefficients[0]; // R
-      colorData[1] = delta.coefficients[1]; // G
-      colorData[2] = delta.coefficients[2]; // B
-      colorData[3] = 0.0; // alpha unchanged
-
-      // Write absolute color values to the GPU buffer
-
-
-      this.device.queue.writeBuffer(
-        this.splatBuffer,
-        colorOffset,
-        colorData.buffer,
-        0,
-        16
-      );
+      const splat = this.splats[delta.gaussianIndex];
+      splat.color[0] = delta.coefficients[0];
+      splat.color[1] = delta.coefficients[1];
+      splat.color[2] = delta.coefficients[2];
+      this.lastSortSignature = "";
     }
   }
 
@@ -220,6 +179,8 @@ export class WebGPURasterizer {
    */
   render(camera: Camera): void {
     if (this.numSplats === 0 || !this.bindGroup) return;
+
+    this.resortSplats(camera.position);
 
     // Update fragment mip-filter uniforms.
     const mipUniformData = new ArrayBuffer(MIP_UNIFORM_SIZE);
@@ -281,6 +242,57 @@ export class WebGPURasterizer {
    */
   setMaxSamplingInterval(sMax: number): void {
     this.maxSamplingInterval = sMax;
+  }
+
+  private writeSplatsToBuffer(splats: GaussianSplat[]): void {
+    const data = new Float32Array(splats.length * (SPLAT_STRIDE / 4));
+    const floatsPerSplat = SPLAT_STRIDE / 4;
+
+    for (let i = 0; i < splats.length; i++) {
+      const splat = splats[i];
+      const base = i * floatsPerSplat;
+
+      data[base + 0] = splat.position[0];
+      data[base + 1] = splat.position[1];
+      data[base + 2] = splat.position[2];
+      data[base + 3] = splat.alpha;
+      data[base + 4] = splat.color[0];
+      data[base + 5] = splat.color[1];
+      data[base + 6] = splat.color[2];
+      data[base + 7] = 1.0;
+
+      const cov3d = computeCov3D(splat.scale, splat.rotation);
+      data[base + 8] = cov3d[0];
+      data[base + 9] = cov3d[1];
+      data[base + 10] = cov3d[2];
+      data[base + 11] = cov3d[3];
+      data[base + 12] = cov3d[4];
+      data[base + 13] = cov3d[5];
+    }
+
+    this.device.queue.writeBuffer(this.splatBuffer, 0, data);
+  }
+
+  private resortSplats(cameraPosition: Float32Array): void {
+    const signature = Array.from(cameraPosition)
+      .map((value) => value.toFixed(3))
+      .join("|");
+    if (signature === this.lastSortSignature) {
+      return;
+    }
+
+    const sortedSplats = [...this.splats].sort(
+      (a, b) => this.distanceSquared(b.position, cameraPosition) - this.distanceSquared(a.position, cameraPosition)
+    );
+    this.writeSplatsToBuffer(sortedSplats);
+    this.lastSortSignature = signature;
+  }
+
+  private distanceSquared(position: Float32Array, cameraPosition: Float32Array): number {
+    const dx = position[0] - cameraPosition[0];
+    const dy = position[1] - cameraPosition[1];
+    const dz = position[2] - cameraPosition[2];
+    return dx * dx + dy * dy + dz * dz;
   }
 
   /**
