@@ -111,7 +111,6 @@ export class WebGPURasterizer {
       },
       primitive: {
         topology: "triangle-strip",
-        stripIndexFormat: "uint32",
       },
     });
   }
