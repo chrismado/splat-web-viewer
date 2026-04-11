@@ -23,6 +23,7 @@ export { decodeSHDeltaBatch, applySHDeltaToSplat } from "./streaming/sh_delta_de
 // Renderers
 export { WebGPURasterizer } from "./renderer/webgpu_renderer";
 export { WebGLFallbackRenderer } from "./renderer/webgl_fallback";
+export { cameraSortSignature, distanceSquared, sortSplatsBackToFront } from "./renderer/splat_sort";
 
 // Export
 export { exportToGLTF } from "./export/gltf_exporter";

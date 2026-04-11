@@ -10,6 +10,7 @@
 
 import { GaussianSplat } from "../compression/spz_decoder";
 import { SphericalHarmonicDelta } from "../streaming/webrtc_client";
+import { cameraSortSignature, sortSplatsBackToFront } from "./splat_sort";
 
 const MIP_UNIFORM_SIZE = 32;
 const VERTEX_UNIFORM_SIZE = 160;
@@ -274,25 +275,14 @@ export class WebGPURasterizer {
   }
 
   private resortSplats(cameraPosition: Float32Array): void {
-    const signature = Array.from(cameraPosition)
-      .map((value) => value.toFixed(3))
-      .join("|");
+    const signature = cameraSortSignature(cameraPosition);
     if (signature === this.lastSortSignature) {
       return;
     }
 
-    const sortedSplats = [...this.splats].sort(
-      (a, b) => this.distanceSquared(b.position, cameraPosition) - this.distanceSquared(a.position, cameraPosition)
-    );
+    const sortedSplats = sortSplatsBackToFront(this.splats, cameraPosition);
     this.writeSplatsToBuffer(sortedSplats);
     this.lastSortSignature = signature;
-  }
-
-  private distanceSquared(position: Float32Array, cameraPosition: Float32Array): number {
-    const dx = position[0] - cameraPosition[0];
-    const dy = position[1] - cameraPosition[1];
-    const dz = position[2] - cameraPosition[2];
-    return dx * dx + dy * dy + dz * dz;
   }
 
   /**

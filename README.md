@@ -69,6 +69,13 @@ Standard 3DGS dilation can create popping, dilation artifacts, and high-frequenc
 
 The streaming layer is an integration point for creative review workflows: a WebRTC data channel can receive compressed delta-updates of spherical harmonic coefficients from a remote process. The browser applies those deltas to local Gaussian colors before rasterizing. End-to-end server integration and latency measurement remain future work.
 
+### Shared Sort Path
+
+Both rendering paths now use the same back-to-front splat sorting utility. That
+keeps alpha blending behavior consistent between WebGPU and WebGL and gives the
+repo a pure, unit-testable sort path even in environments where browser rendering
+itself cannot be exercised in CI.
+
 ---
 
 ## Measurement Plan
