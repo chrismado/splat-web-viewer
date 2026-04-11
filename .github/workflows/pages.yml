@@ -45,9 +45,9 @@ jobs:
           # Fix import path — demo/index.html references ../dist/ but _site is flat
           sed -i 's|\.\./dist/|./dist/|g' _site/index.html
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
 
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
