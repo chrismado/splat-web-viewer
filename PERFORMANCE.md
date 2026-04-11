@@ -1,40 +1,34 @@
 # Performance
 
-## Benchmark Summary
+## Measurement Plan
 
-| Metric | Result |
-|--------|--------|
-| Bandwidth reduction vs PLY | 90% (250MB → ~25MB) |
-| Render FPS at 1080p | 60+ (Chrome/Firefox) |
-| PSNR loss at extreme zoom | < 2 dB vs uncompressed |
-| WebRTC SH delta latency | < 100 ms end-to-end |
+This repo is currently a rendering and workflow prototype. The metrics below are the measurements to collect before presenting this as production-grade viewer infrastructure.
 
-Hardware: Consumer GPU (RTX 3090), Chrome 122+.
+| Metric | Current Status | Next Measurement |
+|--------|----------------|------------------|
+| SPZ compression ratio vs PLY | Parser exists | Compare a public PLY scene against equivalent SPZ bytes |
+| Render FPS at 1080p | WebGPU/WebGL paths exist | Run `npm run benchmark` on a fixed sample scene |
+| Mip-filter visual quality | Shader path exists | Capture side-by-side zoom images against baseline splatting |
+| WebRTC SH delta latency | Client hooks exist | Add local server harness with timestamped delta packets |
 
-## SPZ Decompression
+## SPZ Decoding
 
-The WASM SPZ decoder handles coordinate system conversion from SPZ internal
-Right-Up-Back system to standard WebGL coordinates. Decompression is single-threaded
-in the main thread — large splat files (>50MB compressed) may cause frame drops
-during initial load.
+The TypeScript SPZ decoder handles coordinate system conversion from SPZ internal Right-Up-Back coordinates to standard WebGL-style coordinates. Decompression is single-threaded in the main thread, so large splat files may cause frame drops during initial load.
 
 ## Mip-Filtering
 
-The dynamic 2D Mip-filter runs entirely in the fragment shader. No CPU-side
-precomputation is required. The filter constrains Gaussian frequency content
-based on the current focal length and viewing distance, eliminating aliasing
-at any zoom level without per-frame CPU work.
+The 2D Mip-filter exploration runs in the WebGPU fragment shader. The next step is to capture visual comparisons against a baseline renderer at multiple focal lengths and scene distances.
 
-## Environment
+## Target Environment
 
-- GPU: NVIDIA GeForce RTX 3090
-- Browser: Chrome 122+
-- Measured: April 2026
+- Browser: Chrome or Edge with WebGPU enabled
+- Fallback: WebGL 2
+- Measured: TBD with checked-in sample assets
 
 ## Optimization Roadmap
 
-1. **GPU radix sort for depth ordering** — Current depth sort is a bottleneck for scenes > 1M splats. A WebGPU compute shader radix sort would move this off the CPU.
-2. **Adaptive SH band selection** — Only decode and transmit SH bands visible at current viewing distance. Reduces WebRTC bandwidth for distant views.
-3. **Tile-based culling** — Skip rendering tiles with no visible splats. Reduces fragment shader invocations for partially occluded scenes.
-4. **Quantized delta compression** — Compress SH deltas to 8-bit fixed point before WebRTC transmission. ~4x bandwidth reduction.
-5. **Mobile WebGPU profiling** — Test on mobile GPUs (Adreno, Mali) where WebGPU support is emerging.
+1. **GPU radix sort for depth ordering** - Current rendering does not include production-grade depth sorting. A WebGPU compute shader radix sort would move this off the CPU.
+2. **Adaptive SH band selection** - Only decode and transmit SH bands visible at the current viewing distance.
+3. **Tile-based culling** - Skip rendering tiles with no visible splats to reduce fragment shader invocations.
+4. **Quantized delta compression** - Compress SH deltas to 8-bit fixed point before WebRTC transmission.
+5. **Mobile WebGPU profiling** - Test on mobile GPUs where WebGPU support is emerging.

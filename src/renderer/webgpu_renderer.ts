@@ -11,9 +11,12 @@
 import { GaussianSplat } from "../compression/spz_decoder";
 import { SphericalHarmonicDelta } from "../streaming/webrtc_client";
 
-// Matches the SplatData struct in mip_splatting.wgsl
-// position: vec3<f32> + opacity: f32 + color: vec4<f32> + cov3d: array<f32, 6>
-const SPLAT_STRIDE = (3 + 1 + 4 + 6) * 4; // 56 bytes per splat
+const MIP_UNIFORM_SIZE = 32;
+const VERTEX_UNIFORM_SIZE = 160;
+
+// Matches the SplatData struct in mip_splatting.wgsl. WGSL rounds the struct
+// stride up to the largest member alignment, so each array element is 64 bytes.
+const SPLAT_STRIDE = 16 * 4;
 
 interface Camera {
   viewMatrix: Float32Array;  // 4x4 column-major
@@ -66,15 +69,17 @@ export class WebGPURasterizer {
     const shaderCode = await this.loadShader();
     const shaderModule = this.device.createShaderModule({ code: shaderCode });
 
-    // Vertex uniform buffer: view/proj matrices, camera params
-    // VertexUniforms: mat4x4 (64) + mat4x4 (64) + vec3 (12) + f32 (4) + vec2 (8) + vec2 (8) = 160 bytes
+    // Fragment mip-filter params:
+    // viewport (8) + focal (8) + max_sampling_interval (4) + padding (12) = 32 bytes.
     this.uniformBuffer = this.device.createBuffer({
-      size: 160,
+      size: MIP_UNIFORM_SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
+    // VertexUniforms:
+    // view/proj matrices (128) + camera_pos/max_sampling_interval (16) + viewport/focal (16).
     this.vertexUniformBuffer = this.device.createBuffer({
-      size: 160,
+      size: VERTEX_UNIFORM_SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -132,7 +137,7 @@ export class WebGPURasterizer {
 
     // Pack splat data into the buffer format expected by the shader
     const data = new Float32Array(this.numSplats * (SPLAT_STRIDE / 4));
-    const floatsPerSplat = SPLAT_STRIDE / 4; // 14
+    const floatsPerSplat = SPLAT_STRIDE / 4;
 
     for (let i = 0; i < this.numSplats; i++) {
       const splat = splats[i];
@@ -217,9 +222,20 @@ export class WebGPURasterizer {
   render(camera: Camera): void {
     if (this.numSplats === 0 || !this.bindGroup) return;
 
-    // Update uniform buffer with camera data
-    const uniformData = new ArrayBuffer(160);
-    const f32 = new Float32Array(uniformData);
+    // Update fragment mip-filter uniforms.
+    const mipUniformData = new ArrayBuffer(MIP_UNIFORM_SIZE);
+    const mipF32 = new Float32Array(mipUniformData);
+    mipF32[0] = this.canvas.width;
+    mipF32[1] = this.canvas.height;
+    mipF32[2] = camera.focalX;
+    mipF32[3] = camera.focalY;
+    mipF32[4] = this.maxSamplingInterval;
+
+    this.device.queue.writeBuffer(this.uniformBuffer, 0, mipUniformData);
+
+    // Update vertex camera uniforms.
+    const vertexUniformData = new ArrayBuffer(VERTEX_UNIFORM_SIZE);
+    const f32 = new Float32Array(vertexUniformData);
 
     // view_matrix: mat4x4 at offset 0
     f32.set(camera.viewMatrix, 0);
@@ -236,7 +252,7 @@ export class WebGPURasterizer {
     f32[38] = camera.focalX;
     f32[39] = camera.focalY;
 
-    this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
+    this.device.queue.writeBuffer(this.vertexUniformBuffer, 0, vertexUniformData);
 
     const encoder = this.device.createCommandEncoder();
     const textureView = this.context.getCurrentTexture().createView();
@@ -272,11 +288,20 @@ export class WebGPURasterizer {
    * Load the mip-splatting WGSL shader source.
    */
   private async loadShader(): Promise<string> {
-    const response = await fetch("shaders/mip_splatting.wgsl");
-    if (!response.ok) {
-      throw new Error(`Failed to load shader: ${response.status}`);
+    const candidates = [
+      "shaders/mip_splatting.wgsl",
+      "../shaders/mip_splatting.wgsl",
+      "/shaders/mip_splatting.wgsl",
+    ];
+
+    for (const path of candidates) {
+      const response = await fetch(path);
+      if (response.ok) {
+        return response.text();
+      }
     }
-    return response.text();
+
+    throw new Error("Failed to load shader from known demo paths");
   }
 
   /**

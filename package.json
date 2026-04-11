@@ -10,8 +10,8 @@
     "lint": "eslint src/ benchmarks/ examples/ --ext .ts",
     "docs": "typedoc",
     "benchmark": "tsx benchmarks/performance_test.ts",
-    "demo": "python -m http.server 8080 --directory demo",
-    "stream-demo": "concurrently \"python streaming/webrtc_server.py\" \"npm run demo\""
+    "demo": "python -m http.server 8080",
+    "stream-demo": "concurrently \"python src/streaming/webrtc_server.py\" \"npm run demo\""
   },
   "devDependencies": {
     "@rollup/plugin-typescript": "^11.1.0",

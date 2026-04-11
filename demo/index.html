@@ -39,6 +39,7 @@
     <button id="btn-load" onclick="document.getElementById('file-input').click()">
       Load .spz
     </button>
+    <button id="btn-sample">Load Sample Scene</button>
     <button id="btn-export">Export glTF</button>
     <button id="btn-stream">Connect Stream</button>
     <button id="btn-info" onclick="document.getElementById('overlay').classList.toggle('hidden')">
@@ -55,9 +56,6 @@
     const statsEl = document.getElementById("stats");
     const fpsEl = document.getElementById("fps");
 
-    canvas.width = window.innerWidth * devicePixelRatio;
-    canvas.height = window.innerHeight * devicePixelRatio;
-
     let renderer = null;
     let splats = [];
     let useWebGPU = !!navigator.gpu;
@@ -71,14 +69,44 @@
       focalY: canvas.height * 0.8,
     };
 
-    // Identity matrices
+    function resizeCanvas() {
+      canvas.width = Math.floor(window.innerWidth * devicePixelRatio);
+      canvas.height = Math.floor(window.innerHeight * devicePixelRatio);
+      camera.focalX = canvas.width * 0.8;
+      camera.focalY = canvas.height * 0.8;
+      camera.projMatrix.set([
+        2 * camera.focalX / canvas.width, 0, 0, 0,
+        0, 2 * camera.focalY / canvas.height, 0, 0,
+        0, 0, -1.002, -1,
+        0, 0, -0.2002, 0
+      ]);
+    }
+
     camera.viewMatrix.set([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,-5,1]);
-    camera.projMatrix.set([
-      2*camera.focalX/canvas.width, 0, 0, 0,
-      0, 2*camera.focalY/canvas.height, 0, 0,
-      0, 0, -1.002, -1,
-      0, 0, -0.2002, 0
-    ]);
+    resizeCanvas();
+
+    function makeSplat(x, y, z, color, scale = 0.28, alpha = 0.72) {
+      return {
+        position: new Float32Array([x, y, z]),
+        alpha,
+        color: new Float32Array(color),
+        scale: new Float32Array([scale, scale, scale]),
+        rotation: new Float32Array([1, 0, 0, 0]),
+        sphericalHarmonics: new Float32Array(0),
+      };
+    }
+
+    function loadSampleScene() {
+      splats = [
+        makeSplat(-0.9, -0.35, 0, [0.95, 0.38, 0.22]),
+        makeSplat(-0.35, 0.35, 0.15, [0.95, 0.72, 0.28]),
+        makeSplat(0.25, -0.2, -0.05, [0.25, 0.70, 0.95]),
+        makeSplat(0.8, 0.28, 0.1, [0.65, 0.86, 0.45]),
+        makeSplat(0.05, 0.05, 0.45, [0.95, 0.95, 0.98], 0.18, 0.55),
+      ];
+      renderer.uploadSplats(splats);
+      statsEl.textContent = `Sample scene: ${splats.length} splats`;
+    }
 
     async function initRenderer() {
       if (useWebGPU) {
@@ -96,6 +124,7 @@
         renderer.initialize();
         statsEl.textContent = "Renderer: WebGL 2 (fallback)";
       }
+      loadSampleScene();
     }
 
     // Load .spz file
@@ -109,6 +138,8 @@
       renderer.uploadSplats(splats);
       statsEl.textContent = `${splats.length.toLocaleString()} splats (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB)`;
     });
+
+    document.getElementById("btn-sample").addEventListener("click", loadSampleScene);
 
     // Export glTF
     document.getElementById("btn-export").addEventListener("click", () => {
@@ -160,8 +191,7 @@
 
     // Resize handling
     window.addEventListener("resize", () => {
-      canvas.width = window.innerWidth * devicePixelRatio;
-      canvas.height = window.innerHeight * devicePixelRatio;
+      resizeCanvas();
     });
   </script>
 </body>

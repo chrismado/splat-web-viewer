@@ -1,12 +1,12 @@
 # splat-web-viewer
 
-**Anti-Aliased WebGPU Gaussian Splat Engine with Real-Time WebRTC Streaming**
+**Browser Gaussian Splat Review Prototype**
 
-A dependency-free WebGPU/WebGL viewer that natively streams .spz compressed Gaussian splats via SPZ decompression (WebAssembly), executes dynamic 2D Mip-filtering in the fragment shader to eliminate aliasing, and receives live spherical harmonic delta updates over a WebRTC bi-directional data channel for sub-100ms interactive rendering.
+A TypeScript prototype for browser-native Gaussian splat review. It includes SPZ parsing with the browser `DecompressionStream` API, WebGPU/WebGL rendering paths, shader-side mip-filtering exploration, a built-in sample scene, and a WebRTC spherical-harmonic delta integration point.
 
-This prototype explores the intersection of browser-native 3D review, compressed Gaussian splat assets, anti-aliased rendering, and live scene updates.
+This repo explores how spatial assets can become fast creative review material: inspect a scene in the browser, choose useful camera references, and carry those references into generative video or previs workflows.
 
-Live demo: [chrismado.github.io/splat-web-viewer](https://chrismado.github.io/splat-web-viewer/)
+Live demo target: [chrismado.github.io/splat-web-viewer](https://chrismado.github.io/splat-web-viewer/)
 
 ---
 
@@ -14,7 +14,7 @@ Live demo: [chrismado.github.io/splat-web-viewer](https://chrismado.github.io/sp
 
 This repo is part of [Creative AI Workflows](https://chrismado.github.io/creative-ai-workflows/) ([source](https://github.com/chrismado/creative-ai-workflows)), a portfolio showcase connecting generative video, 3D scene review, creative QA, and enterprise deployment.
 
-In that system, `splat-web-viewer` is the **visual demo anchor**. It gives creative teams a browser-based way to inspect spatial assets, choose camera positions, and create stronger references before moving into generative video or animation.
+In that system, `splat-web-viewer` is the visual demo anchor. It gives creative teams a browser-based way to inspect spatial assets, choose camera positions, and create stronger references before moving into generative video or animation.
 
 ### Customer-Facing Use Case
 
@@ -30,109 +30,86 @@ An architecture, product, VFX, or digital-human team wants to review spatial con
 
 ## Target Capability Gap
 
-| Viewer | Framework | SPZ Support | Mip-Filtering | WebRTC Streaming |
-|--------|-----------|-------------|---------------|-----------------|
-| mkkellogg/GaussianSplats3D | Three.js (WebGL) | ❌ (proprietary .ksplat) | ❌ | ❌ |
-| nianticlabs/spz | C++/TypeScript WASM | ✅ (data format only) | ❌ | ❌ |
-| autonomousvision/mip-splatting | Python/CUDA (offline) | ❌ | ✅ (pre-baked only) | ❌ |
-| LiXin97/gaussian-viewer | WebGL/Python backend | ❌ | ❌ | ❌ |
-| **splat-web-viewer (this repo)** | **WebGPU/WebGL** | **✅ (native WASM)** | **✅ (dynamic shader)** | **✅ (SH deltas)** |
+| Viewer | Framework | SPZ Support | Mip-Filtering | Streaming |
+|--------|-----------|-------------|---------------|-----------|
+| mkkellogg/GaussianSplats3D | Three.js/WebGL | Proprietary `.ksplat` focus | No | No |
+| nianticlabs/spz | C++/TypeScript tools | Data format tools | No | No |
+| autonomousvision/mip-splatting | Python/CUDA | No | Offline reference | No |
+| LiXin97/gaussian-viewer | WebGL/Python backend | No | No | No |
+| **splat-web-viewer** | **WebGPU/WebGL** | **Prototype parser** | **Prototype shader path** | **Client hooks for SH deltas** |
 
 ---
 
 ## Architecture
 
-```
-Cloud GPU Node                    Browser Client
-──────────────                    ──────────────
-Neural Network                    WebRTC Data Channel
-Inference                         (UDP, bi-directional)
-     │                                    │
-     │  Compressed SH coefficient         │
-     │  delta updates                     │
-     └──────────────────────────────────► │
-                                          │
-                                   WebGPU Rasterizer
-                                          │
-                              ┌───────────┴───────────┐
-                              │                       │
-                     SPZ WASM Decoder        2D Mip Filter
-                     (SPZ → Gaussians)       (Fragment Shader)
-                              │                       │
-                              └───────────┬───────────┘
-                                          │
-                                   Final Render
-                                   60+ FPS · 1080p
-                                   No aliasing at any zoom
+```text
+Cloud or local process
+  |
+  | optional SH coefficient deltas
+  v
+Browser client
+  |
+  |-- SPZ decoder -> Gaussian splat data
+  |-- WebGPU rasterizer -> Mip-filter shader path
+  |-- WebGL fallback -> basic Gaussian quad rendering
+  |
+  v
+Interactive scene review
 ```
 
-### SPZ Decompression (WASM)
-SPZ format (Niantic Labs): packed binary representation, 16-byte header, gzipped arrays of positions, alphas, colors, scales, rotations, spherical harmonics. WASM decompressor handles coordinate system conversion from SPZ internal Right-Up-Back system to standard WebGL coordinate frame.
+### SPZ Decoding
 
-### Dynamic 2D Mip-Filter (Fragment Shader)
-Standard 3DGS uses a 2D dilation filter in screen space — causes popping, dilation artifacts, and high-frequency aliasing when focal length or viewing distance changes. This repo implements the 3D smoothing filter from Mip-Splatting (CVPR 2024) directly in the WebGPU fragment shader, constraining Gaussian frequency content based on training view sampling rates. Result: alias-free rendering at any zoom level.
+SPZ format (Niantic Labs) uses a compact binary layout with gzipped arrays of positions, alphas, colors, scales, rotations, and spherical harmonics. The current prototype decodes those sections in TypeScript with browser-native gzip decompression and converts the SPZ internal Right-Up-Back coordinate frame to the viewer's WebGL-style frame.
 
-### WebRTC Spherical Harmonic Streaming
-The critical upgrade beyond a static renderer: a WebRTC bi-directional data channel receives compressed delta-updates of spherical harmonic coefficients from a cloud GPU inference node in real-time. GPU computes neural network outputs and sends only the delta (changed coefficients). Browser receives deltas over UDP, applies to local Gaussian representation, rasterizes via WebGPU. Result: interactive digital humans and live scene editing at sub-100ms latency.
+### Mip-Filter Shader Path
+
+Standard 3DGS dilation can create popping, dilation artifacts, and high-frequency aliasing when focal length or viewing distance changes. This repo explores a Mip-Splatting-inspired WebGPU shader path for smoothing projected covariance and reducing aliasing artifacts.
+
+### SH Delta Streaming
+
+The streaming layer is an integration point for creative review workflows: a WebRTC data channel can receive compressed delta-updates of spherical harmonic coefficients from a remote process. The browser applies those deltas to local Gaussian colors before rasterizing. End-to-end server integration and latency measurement remain future work.
 
 ---
 
-## Benchmarks
+## Measurement Plan
 
-| Metric | Result |
-|--------|--------|
-| Bandwidth reduction vs PLY | **90%** (250MB → ~25MB) |
-| Render FPS at 1080p | **60+** (Chrome/Firefox) |
-| PSNR loss at extreme zoom vs uncompressed | **<2dB** |
-| WebRTC SH delta latency | **<100ms** end-to-end |
+| Metric | Current Status |
+|--------|----------------|
+| SPZ compression ratio vs PLY | Parser exists; needs corpus measurement |
+| Render FPS at 1080p | WebGPU/WebGL paths exist; needs repeatable browser benchmark |
+| Mip-filter visual quality | Shader path implemented; needs side-by-side aliasing captures |
+| WebRTC SH delta latency | Client hooks exist; needs server harness measurement |
 
-Hardware: Consumer GPU (RTX 3090), Chrome 122+.
+The next credibility step is recording repeatable measurements on a known public splat scene and checking them into `PERFORMANCE.md`.
 
 ---
 
 ## Stack
 
-- **Rendering:** WebGPU (primary), WebGL fallback
-- **Compression:** SPZ format (Niantic Labs), WASM decompressor
-- **Anti-aliasing:** Custom Mip-splatting fragment shader
-- **Streaming:** WebRTC bi-directional data channel (UDP)
-- **Format export:** glTF via KHR_spz_gaussian_splats_compression (Khronos Group, Feb 2026 RC)
-- **Framework:** Vanilla JS/TypeScript — zero dependencies
+- **Rendering:** WebGPU primary path, WebGL 2 fallback
+- **Compression:** SPZ-style parsing with browser-native gzip decompression
+- **Anti-aliasing:** Mip-Splatting-inspired shader path
+- **Streaming:** WebRTC data channel client hooks
+- **Format export:** glTF export prototype
+- **Framework:** Vanilla TypeScript
 
 ---
 
 ## Directory Structure
 
-```
+```text
 splat-web-viewer/
 ├── benchmarks/
-│   └── performance_test.ts
 ├── demo/
-│   └── index.html
 ├── shaders/
-│   └── mip_splatting.wgsl
 ├── src/
 │   ├── compression/
-│   │   ├── coordinate_converter.ts
-│   │   └── spz_decoder.ts
 │   ├── export/
-│   │   └── gltf_exporter.ts
 │   ├── renderer/
-│   │   ├── webgl_fallback.ts
-│   │   └── webgpu_renderer.ts
-│   ├── streaming/
-│   │   ├── sh_delta_decoder.ts
-│   │   ├── webrtc_client.ts
-│   │   └── webrtc_server.py
-│   └── index.ts
+│   └── streaming/
 ├── tests/
-│   └── test_spz_decoder.ts
 ├── wasm/
-│   └── spz_decoder/
-│       └── README.md
 ├── package.json
-├── rollup.config.js
-├── tsconfig.json
 └── README.md
 ```
 
@@ -146,26 +123,22 @@ cd splat-web-viewer
 npm install
 npm run build
 
-# Open demo
+# Open http://localhost:8080/demo/
 npm run demo
 
-# Run with WebRTC streaming
-python streaming/webrtc_server.py --model your_model
+# Optional streaming harness
+python src/streaming/webrtc_server.py --model your_model
 npm run stream-demo
 ```
+
+The demo now loads a small synthetic scene by default, so it should show visible splats even before a `.spz` upload.
 
 ---
 
 ## References
 
-1. **Mip-Splatting: Alias-Free 3D Gaussian Splatting** — Zehao Yu et al., CVPR 2024 Best Student Paper. 3D smoothing filter and 2D Mip filter methodology.
-2. **SPZ: A Compact Gaussian Splat Format** — Niantic Labs. Packed binary SPZ format specification. nianticlabs/spz.
-3. **KHR_gaussian_splatting glTF Extension** — Khronos Group, February 2026 RC. Standard glTF extension for Gaussian splat assets.
-4. **3D Gaussian Splatting for Real-Time Radiance Field Rendering** — Kerbl et al., SIGGRAPH 2023. Foundational 3DGS paper.
-5. **mkkellogg/GaussianSplats3D** — Existing Three.js viewer (lacks SPZ, Mip-filtering, streaming).
-6. **autonomousvision/mip-splatting** — Desktop CUDA Mip-Splatting implementation (not web-compatible).
-7. **Tavus Phoenix-4** — Gaussian-diffusion rendering pipeline for interactive digital humans (production use case this enables).
-
----
-
-*#1 signal for Tavus (Phoenix-4 Gaussian rendering), strong for Luma AI (Interactive Scenes) and Decart (edge-network rendering).*
+1. **Mip-Splatting: Alias-Free 3D Gaussian Splatting** - Zehao Yu et al., CVPR 2024.
+2. **SPZ: A Compact Gaussian Splat Format** - Niantic Labs.
+3. **3D Gaussian Splatting for Real-Time Radiance Field Rendering** - Kerbl et al., SIGGRAPH 2023.
+4. **mkkellogg/GaussianSplats3D** - Existing Three.js viewer reference.
+5. **autonomousvision/mip-splatting** - Desktop CUDA Mip-Splatting implementation reference.

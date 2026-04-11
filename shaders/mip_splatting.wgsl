@@ -216,12 +216,13 @@ fn vs_main(
 
     let splat = splats[instance_idx];
 
-    // Transform to view space
+    // Transform to view space. The demo camera follows WebGL convention:
+    // visible geometry sits in front of the camera along negative Z.
     let pos_world = vec4<f32>(splat.position, 1.0);
     let pos_view = vert_uniforms.view_matrix * pos_world;
 
     // Skip splats behind camera
-    if (pos_view.z <= 0.2) {
+    if (pos_view.z >= -0.2) {
         out.position = vec4<f32>(0.0, 0.0, -1.0, 1.0);
         out.opacity = 0.0;
         return out;
@@ -231,7 +232,7 @@ fn vs_main(
     let cov2d = compute_cov2d(
         splat.cov3d[0], splat.cov3d[1], splat.cov3d[2],
         splat.cov3d[3], splat.cov3d[4], splat.cov3d[5],
-        pos_view.xyz,
+        vec3<f32>(pos_view.x, pos_view.y, -pos_view.z),
         vert_uniforms.focal,
         vert_uniforms.max_sampling_interval,
     );
