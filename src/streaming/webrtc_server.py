@@ -17,11 +17,9 @@ Usage:
 
 import argparse
 import asyncio
-import json
 import logging
 import struct
 import time
-from typing import Optional
 
 import numpy as np
 from aiohttp import web
@@ -63,7 +61,6 @@ def encode_sh_delta(
 
 async def send_sh_deltas(
     channel: RTCDataChannel,
-    model: Optional[object] = None,
     num_gaussians: int = 100_000,
     target_fps: int = 30,
 ) -> None:
@@ -76,7 +73,6 @@ async def send_sh_deltas(
 
     Args:
         channel: Open WebRTC data channel to send deltas on.
-        model: Neural network model for SH inference (None = simulated).
         num_gaussians: Total number of Gaussians in the scene.
         target_fps: Target update rate in frames per second.
     """
@@ -87,28 +83,24 @@ async def send_sh_deltas(
         t_start = time.monotonic()
         timestamp = time.time()
 
-        if model is not None:
-            # Production path: run inference, diff against previous SH state
-            # deltas = model.compute_sh_deltas(camera_pose)
-            raise NotImplementedError("Model inference not yet integrated")
-        else:
-            # Simulation: send small random deltas for a subset of Gaussians
-            # In practice, only ~1-5% of Gaussians change per frame
-            num_changed = max(1, num_gaussians // 100)
-            changed_indices = np.random.choice(
-                num_gaussians, size=num_changed, replace=False
-            )
+        # Simulation: send small random deltas for a subset of Gaussians.
+        # The real inference-backed SH delta path is not integrated yet, so the
+        # server is intentionally explicit about being a streaming harness.
+        num_changed = max(1, num_gaussians // 100)
+        changed_indices = np.random.choice(
+            num_gaussians, size=num_changed, replace=False
+        )
 
-            for idx in changed_indices:
-                # Simulate small SH coefficient changes (3 RGB DC coefficients)
-                coeffs = np.random.randn(3).astype(np.float32) * 0.001
-                packet = encode_sh_delta(int(idx), coeffs, timestamp)
+        for idx in changed_indices:
+            # Simulate small SH coefficient changes (3 RGB DC coefficients)
+            coeffs = np.random.randn(3).astype(np.float32) * 0.001
+            packet = encode_sh_delta(int(idx), coeffs, timestamp)
 
-                try:
-                    channel.send(packet)
-                except Exception as e:
-                    logger.warning("Failed to send delta: %s", e)
-                    return
+            try:
+                channel.send(packet)
+            except Exception as e:
+                logger.warning("Failed to send delta: %s", e)
+                return
 
         frame += 1
 
@@ -196,12 +188,9 @@ def create_app() -> web.Application:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="WebRTC SH Delta Streaming Server")
+    parser = argparse.ArgumentParser(description="WebRTC SH delta streaming harness")
     parser.add_argument("--host", default="0.0.0.0", help="Listen address")
     parser.add_argument("--port", type=int, default=8081, help="Listen port")
-    parser.add_argument(
-        "--model", default=None, help="Path to neural network model (omit for simulation)"
-    )
     parser.add_argument("--log-level", default="INFO", help="Logging level")
     args = parser.parse_args()
 

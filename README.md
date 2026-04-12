@@ -171,12 +171,14 @@ npm run build
 # Open http://localhost:8080/demo/
 npm run demo
 
-# Optional streaming harness
-python src/streaming/webrtc_server.py --model your_model
+# Optional streaming harness (simulation-only today)
+python src/streaming/webrtc_server.py
 npm run stream-demo
 ```
 
 The demo now loads a small synthetic scene by default, so it should show visible splats even before a `.spz` upload.
+The current WebRTC server is a streaming harness for simulated SH delta updates;
+it does not yet expose a real model-backed inference path.
 
 ---
 

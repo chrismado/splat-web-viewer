@@ -2,6 +2,7 @@
   "name": "splat-web-viewer",
   "version": "0.1.0",
   "description": "Anti-aliased WebGPU Gaussian splat viewer with SPZ streaming and WebRTC",
+  "type": "module",
   "scripts": {
     "build": "tsc && rollup -c",
     "typecheck": "tsc --noEmit",
