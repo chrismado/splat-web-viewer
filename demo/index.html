@@ -12,37 +12,42 @@
     #canvas.dragging { cursor: grabbing; }
     #overlay {
       position: fixed; top: 16px; left: 16px;
-      background: rgba(0,0,0,0.7); padding: 12px 16px; border-radius: 8px;
+      background: rgba(0, 0, 0, 0.72); padding: 12px 16px; border-radius: 8px;
       font-size: 13px; line-height: 1.5; pointer-events: none;
     }
     #overlay.hidden { display: none; }
     #controls {
       position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-      display: flex; gap: 8px;
+      display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
     }
     #controls button {
       background: #333; border: 1px solid #555; color: #eee;
       padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;
     }
+    #controls button.primary {
+      background: #f1b84b; border-color: #f1b84b; color: #18120a; font-weight: 700;
+    }
     #controls button:hover { background: #444; }
+    #controls button.primary:hover { background: #ffd477; }
     #file-input { display: none; }
   </style>
 </head>
 <body>
   <canvas id="canvas"></canvas>
 
-    <div id="overlay">
-      <div>Splat Web Viewer</div>
-      <div id="stats">No file loaded</div>
-      <div>Drag to orbit · Wheel to zoom</div>
-      <div id="fps"></div>
-    </div>
+  <div id="overlay">
+    <div>Splat Web Viewer</div>
+    <div id="stats">Loading sample scene...</div>
+    <div>Sample scene autoloads on open</div>
+    <div>Drag to orbit - Wheel to zoom</div>
+    <div id="fps"></div>
+  </div>
 
   <div id="controls">
     <button id="btn-load" onclick="document.getElementById('file-input').click()">
       Load .spz
     </button>
-    <button id="btn-sample">Load Sample Scene</button>
+    <button id="btn-sample" class="primary">Reset Sample Scene</button>
     <button id="btn-export">Export glTF</button>
     <button id="btn-stream">Connect Stream</button>
     <button id="btn-info" onclick="document.getElementById('overlay').classList.toggle('hidden')">
@@ -68,6 +73,7 @@
     let dragging = false;
     let lastPointerX = 0;
     let lastPointerY = 0;
+    let streamingActive = false;
 
     function setStatus(message) {
       statsEl.textContent = message;
@@ -79,7 +85,6 @@
       statsEl.textContent = `Error: ${message}`;
     }
 
-    // Camera state
     const camera = {
       viewMatrix: new Float32Array(16),
       projMatrix: new Float32Array(16),
@@ -166,7 +171,8 @@
         return;
       }
       renderer.uploadSplats(splats);
-      setStatus(`Sample scene: ${splats.length} splats`);
+      const streamSuffix = streamingActive ? " - streaming" : "";
+      setStatus(`Sample scene ready - ${splats.length} splats${streamSuffix}`);
     }
 
     async function initRenderer() {
@@ -174,7 +180,6 @@
         try {
           renderer = new WebGPURasterizer(canvas);
           await renderer.initialize();
-          setStatus("Renderer: WebGPU");
         } catch (e) {
           console.warn("WebGPU init failed, falling back to WebGL:", e);
           useWebGPU = false;
@@ -183,12 +188,10 @@
       if (!useWebGPU) {
         renderer = new WebGLFallbackRenderer(canvas);
         renderer.initialize();
-        setStatus("Renderer: WebGL 2 (fallback)");
       }
       loadSampleScene();
     }
 
-    // Load .spz file
     document.getElementById("file-input").addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -197,6 +200,7 @@
         if (!renderer) {
           throw new Error("Renderer not initialized");
         }
+        streamingActive = false;
         setStatus(`Loading ${file.name}...`);
         const buffer = await file.arrayBuffer();
         splats = await decodeSPZ(buffer);
@@ -209,7 +213,10 @@
       }
     });
 
-    document.getElementById("btn-sample").addEventListener("click", loadSampleScene);
+    document.getElementById("btn-sample").addEventListener("click", () => {
+      streamingActive = false;
+      loadSampleScene();
+    });
 
     canvas.addEventListener("pointerdown", (event) => {
       dragging = true;
@@ -247,9 +254,11 @@
       updateCameraView();
     }, { passive: false });
 
-    // Export glTF
     document.getElementById("btn-export").addEventListener("click", () => {
-      if (splats.length === 0) { alert("No splats loaded"); return; }
+      if (splats.length === 0) {
+        alert("No splats loaded");
+        return;
+      }
       const json = exportToGLTF(splats);
       const blob = new Blob([json], { type: "model/gltf+json" });
       const url = URL.createObjectURL(blob);
@@ -260,7 +269,6 @@
       URL.revokeObjectURL(url);
     });
 
-    // WebRTC streaming
     document.getElementById("btn-stream").addEventListener("click", async () => {
       const serverUrl = prompt("WebRTC server URL:", "http://localhost:8081");
       if (!serverUrl) return;
@@ -272,13 +280,13 @@
           }
         });
         await client.connect();
-        setStatus(`${statsEl.textContent} | Streaming`);
+        streamingActive = true;
+        setStatus(`${statsEl.textContent} - streaming`);
       } catch (error) {
         setError(error);
       }
     });
 
-    // Render loop
     let lastTime = performance.now();
     let frameCount = 0;
 
@@ -301,7 +309,6 @@
       setError(error);
     });
 
-    // Resize handling
     window.addEventListener("resize", () => {
       resizeCanvas();
     });
